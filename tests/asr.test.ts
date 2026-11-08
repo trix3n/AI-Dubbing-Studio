@@ -267,3 +267,34 @@ describe("R2 direct upload signing without network requests", () => {
     expect(url.searchParams.get("X-Amz-Expires")).toBe("600");
   });
 });
+
+describe("non-billable server configuration diagnostics", () => {
+  it("reports only missing variable names and reuses configured bindings", async () => {
+    for (const name of [
+      "DEEPGRAM_API_KEY",
+      "R2_ACCOUNT_ID",
+      "R2_ACCESS_KEY_ID",
+      "R2_SECRET_ACCESS_KEY",
+      "R2_BUCKET_NAME",
+    ])
+      vi.stubEnv(name, "");
+    vi.stubEnv("DEEPGRAM_API_KEY", "test-only-do-not-expose");
+    const { missingConfiguration, configured } =
+      await import("../src/server/asr/storage");
+    expect(missingConfiguration()).toEqual([
+      "R2_ACCOUNT_ID",
+      "R2_ACCESS_KEY_ID",
+      "R2_SECRET_ACCESS_KEY",
+      "R2_BUCKET_NAME",
+    ]);
+    expect(JSON.stringify(missingConfiguration())).not.toContain(
+      "test-only-do-not-expose",
+    );
+    expect(configured()).toBe(false);
+  });
+  it("treats blank bindings as missing", async () => {
+    vi.stubEnv("DEEPGRAM_API_KEY", "   ");
+    const { missingConfiguration } = await import("../src/server/asr/storage");
+    expect(missingConfiguration()).toContain("DEEPGRAM_API_KEY");
+  });
+});

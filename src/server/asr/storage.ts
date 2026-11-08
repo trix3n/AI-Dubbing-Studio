@@ -13,14 +13,19 @@ export interface AsrStore {
   upload(job: AsrJob): Promise<string>;
   source(job: AsrJob): Promise<string>;
 }
+const requiredVariables = [
+  "R2_ACCOUNT_ID",
+  "R2_ACCESS_KEY_ID",
+  "R2_SECRET_ACCESS_KEY",
+  "R2_BUCKET_NAME",
+  "DEEPGRAM_API_KEY",
+] as const;
+export function missingConfiguration(): string[] {
+  // Names only: never expose values or probe a billable provider endpoint.
+  return requiredVariables.filter((name) => !process.env[name]?.trim());
+}
 export function configured() {
-  return [
-    "R2_ACCOUNT_ID",
-    "R2_ACCESS_KEY_ID",
-    "R2_SECRET_ACCESS_KEY",
-    "R2_BUCKET_NAME",
-    "DEEPGRAM_API_KEY",
-  ].every((k) => Boolean(process.env[k]));
+  return missingConfiguration().length === 0;
 }
 export function storage(): AsrStore {
   if (!configured())

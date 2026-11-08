@@ -33,6 +33,7 @@ export default function RecognitionPanel({
   const [config, setConfig] = useState<{
     configured: boolean;
     enabled: boolean;
+    missing?: string[];
   } | null>(null);
   const [job, setJob] = useState<PublicAsrJob | null>(null);
   const [stage, setStage] = useState("");
@@ -312,7 +313,9 @@ export default function RecognitionPanel({
         {!config
           ? "Checking recognition configuration…"
           : !config.configured
-            ? "Server setup required: Deepgram and private R2 storage."
+            ? config.missing?.length
+              ? `Server setup required: ${config.missing.join(", ")}. Configure these in the existing Vercel project and redeploy.`
+              : "Server setup required: Deepgram and private R2 storage."
             : !config.enabled
               ? "Real recognition is disabled until the owner approves the paid pilot."
               : stage ||

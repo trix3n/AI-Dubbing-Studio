@@ -5,6 +5,7 @@ import { POST as start } from "../src/app/api/asr/jobs/[id]/start/route";
 import { GET as getJob } from "../src/app/api/asr/jobs/[id]/route";
 vi.mock("../src/server/asr/storage", () => ({
   configured: () => true,
+  missingConfiguration: () => [],
   storage: () => ({ read: async () => null }),
 }));
 afterEach(() => vi.unstubAllEnvs());

@@ -70,13 +70,11 @@ test("explicit consent, direct upload, async recovery, Russian segments and SRT"
   );
   await page.goto("/");
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
-  await page
-    .getByLabel("Upload media")
-    .setInputFiles({
-      name: "russian.wav",
-      mimeType: "audio/wav",
-      buffer: wav(),
-    });
+  await page.getByLabel("Upload media").setInputFiles({
+    name: "russian.wav",
+    mimeType: "audio/wav",
+    buffer: wav(),
+  });
   const button = page.getByRole("button", {
     name: "Recognize Russian speech",
     exact: true,
@@ -157,4 +155,23 @@ test("provider failure and uncertain outcome are visible after refresh", async (
   await expect(page.locator('p[role="alert"]')).toContainText(
     "Billing may have occurred",
   );
+});
+
+test("configured Deepgram key does not hide missing private storage settings", async ({
+  page,
+}) => {
+  await page.route("**/api/asr/config", (route) =>
+    route.fulfill({
+      json: { configured: false, enabled: false, missing: ["R2_BUCKET_NAME"] },
+    }),
+  );
+  await page.goto("/");
+  await expect(
+    page.getByText(
+      "Server setup required: R2_BUCKET_NAME. Configure these in the existing Vercel project and redeploy.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Recognize Russian speech", exact: true }),
+  ).toBeDisabled();
 });
