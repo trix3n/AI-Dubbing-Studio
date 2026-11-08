@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
   AudioLines,
@@ -25,6 +25,7 @@ import {
 import { demoProject, timestamp, toSrt, validateMedia } from "@/lib/demo";
 import { voices, type Voice, type Project } from "@/types/studio";
 import Badge from "./badge";
+import RecognitionPanel from "./recognition-panel";
 import VoicePreview from "./voice-preview";
 const subscribe = () => () => {};
 export default function Studio() {
@@ -43,8 +44,34 @@ export default function Studio() {
     url: string;
     video: boolean;
   } | null>(null);
-  const [drag, setDrag] = useState(false);
+  useEffect(() => {
+    if (project.source !== "deepgram") return;
+    Promise.resolve().then(() => {
+      try {
+        localStorage.setItem("longray-project", JSON.stringify(project));
+      } catch {
+        setMessage(
+          "Edits could not be saved in this browser. Export Russian SRT before closing this tab.",
+        );
+      }
+    });
+  }, [project]);
   const [saved, setSaved] = useState(false);
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      try {
+        const p = JSON.parse(localStorage.getItem("longray-project") || "null");
+        if (p?.source === "deepgram" && Array.isArray(p.segments)) {
+          setProject(p);
+          setSaved(true);
+        }
+      } catch {
+        /* Existing manual restore reports storage errors. */
+      }
+    });
+  }, []);
+  const [drag, setDrag] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const player = useRef<HTMLVideoElement>(null);
   const reviewed = project.segments.filter(
@@ -55,6 +82,23 @@ export default function Studio() {
       ...p,
       segments: p.segments.map((s) => (s.id === id ? { ...s, ...patch } : s)),
     }));
+    if (project.source === "deepgram") {
+      try {
+        localStorage.setItem(
+          "longray-project",
+          JSON.stringify({
+            ...project,
+            segments: project.segments.map((s) =>
+              s.id === id ? { ...s, ...patch } : s,
+            ),
+          }),
+        );
+      } catch {
+        setMessage(
+          "Edits could not be saved locally. Keep this tab open and export your transcript.",
+        );
+      }
+    }
     setSaved(false);
   }
   function upload(file?: File) {
@@ -65,13 +109,14 @@ export default function Studio() {
       return;
     }
     if (media) URL.revokeObjectURL(media.url);
+    setSourceFile(file);
     setMedia({
       name: file.name,
       url: URL.createObjectURL(file),
       video: /\.mp4$/i.test(file.name),
     });
     setMessage(
-      "Media loaded locally. The sample transcript is unchanged; automatic transcription is not connected.",
+      "Media loaded locally. Use Recognize Russian speech to explicitly submit a short paid pilot; selecting a file alone makes no API call.",
     );
   }
   function save() {
@@ -111,17 +156,31 @@ export default function Studio() {
   }
   function exportSrt() {
     const url = URL.createObjectURL(
-      new Blob([toSrt(project.segments)], {
-        type: "application/x-subrip;charset=utf-8",
-      }),
+      new Blob(
+        [
+          toSrt(
+            project.source === "deepgram"
+              ? project.segments.map((s) => ({ ...s, translation: s.original }))
+              : project.segments,
+          ),
+        ],
+        {
+          type: "application/x-subrip;charset=utf-8",
+        },
+      ),
     );
     const a = document.createElement("a");
     a.href = url;
-    a.download = "longray-vietnamese.srt";
+    a.download =
+      project.source === "deepgram"
+        ? "longray-russian.srt"
+        : "longray-vietnamese.srt";
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     setMessage(
-      "Vietnamese subtitles exported from the current demo transcript.",
+      project.source === "deepgram"
+        ? "Russian subtitles exported from the recognized transcript."
+        : "Vietnamese subtitles exported from the current demo transcript.",
     );
   }
   return (
@@ -167,7 +226,7 @@ export default function Studio() {
         <div className="sidebar-bottom">
           <span className="avatar">L</span>
           <div>
-            Personal workspace<small>Private · Local demo</small>
+            Personal workspace<small>Private · Personal</small>
           </div>
           <Settings2 size={16} />
         </div>
@@ -191,7 +250,11 @@ export default function Studio() {
                   : view === "Voice library"
                     ? "Voice library"
                     : "Your projects"}
-                <span className="demo-tag">LOCAL DEMO</span>
+                <span className="demo-tag">
+                  {project.source === "deepgram"
+                    ? "RUSSIAN TRANSCRIPT"
+                    : "LOCAL DEMO"}
+                </span>
               </h1>
               <p>
                 A Russian conversation. A Vietnamese voice. A world of
@@ -212,6 +275,7 @@ export default function Studio() {
                 });
                 setSaved(false);
                 if (media) URL.revokeObjectURL(media.url);
+                setSourceFile(null);
                 setMedia(null);
                 setMessage(
                   "New demo project created with sample interview segments.",
@@ -343,7 +407,7 @@ export default function Studio() {
                       {media ? "Replace file" : "Choose file"}
                     </button>
                     <small>
-                      MP4, MP3, WAV, M4A · Up to 500 MB · Stays on your device
+                      MP4, MP3, WAV, M4A · Local playback up to 500 MB · Cloud upload only after approval
                     </small>
                     <input
                       ref={input}
@@ -370,6 +434,19 @@ export default function Studio() {
                       aria-label="Source media player"
                     />
                   )}
+                  <RecognitionPanel
+                    key={
+                      sourceFile
+                        ? `${sourceFile.name}:${sourceFile.size}:${sourceFile.lastModified}`
+                        : "no-source"
+                    }
+                    file={sourceFile}
+                    onComplete={(p) => {
+                      setProject(p);
+                      setSaved(true);
+                    }}
+                    onStatus={setMessage}
+                  />
                   <div className="language-row">
                     <div>
                       <label>Source language</label>
@@ -473,8 +550,15 @@ export default function Studio() {
                 </div>
                 <div className="transcript-toolbar">
                   <span>
-                    <span className="green-dot" /> Sample interview{" "}
-                    <span className="toolbar-divider">/</span> 00:38 duration
+                    <span className="green-dot" />{" "}
+                    {project.source === "deepgram"
+                      ? "Russian transcript"
+                      : "Sample interview"}{" "}
+                    <span className="toolbar-divider">/</span>{" "}
+                    {project.duration
+                      ? timestamp(project.duration).slice(0, 5)
+                      : "00:38"}{" "}
+                    duration
                   </span>
                   <label className="search">
                     <Search size={15} />
@@ -646,14 +730,20 @@ export default function Studio() {
                               ? "Loaded locally"
                               : "Awaiting upload"
                             : i < 3
-                              ? "Sample data"
+                              ? project.source === "deepgram"
+                                ? i === 1
+                                  ? "Deepgram transcript"
+                                  : "Not connected"
+                                : "Sample data"
                               : "Not connected"}
                         </small>
                       </div>
                     ))}
                   </div>
                   <p className="hint">
-                    No background jobs or external API calls are running.
+                    {project.source === "deepgram"
+                      ? "Russian recognition complete. Translation and voice-over are not connected."
+                      : "Sample transcript. See recognition status above; no paid call starts automatically."}
                   </p>
                 </section>
                 <section className="panel export-panel">
@@ -662,8 +752,7 @@ export default function Studio() {
                     <Download size={17} />
                   </div>
                   <p>
-                    Export your Vietnamese subtitles, or prepare for future
-                    audio and video rendering.
+                    {project.source === "deepgram" ? "Export the recognized Russian subtitles. Translation, audio and video rendering are not connected." : "Export your Vietnamese subtitles, or prepare for future audio and video rendering."}
                   </p>
                   <div className="export-buttons">
                     <button className="primary" onClick={exportSrt}>

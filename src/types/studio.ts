@@ -16,4 +16,10 @@ export type Segment = {
   voice: Voice;
   status: "Draft" | "Reviewed";
 };
-export type Project = { id: string; name: string; segments: Segment[] };
+export type Project = {
+  id: string;
+  name: string;
+  segments: Segment[];
+  source?: "deepgram";
+  duration?: number;
+};

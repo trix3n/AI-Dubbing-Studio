@@ -1,5 +1,7 @@
 # LONGRAY AI Dubbing Studio
 
+**Current milestone: TASK 02A.** Server-side Deepgram Russian recognition is implemented for an explicitly approved short pilot, with direct private R2 upload and persisted job/results. Real provider quality and deployed configuration are not yet verified. See [Task 02A setup, limits and browser test](docs/TASK_02A.md). The Task 01 sections below describe the original demo.
+
 A private, browser-based workspace for translating Russian interviews into Vietnamese. Task 01 is a functional **local demo**, not a production dubbing pipeline. The owner uses only a browser; the commands below are for developers and the hosted development environment. No Intel Mac software installation is required to use the hosted UI. Production hosting and authentication are future work; do not expose this demo as a private production service.
 
 ## Development
@@ -11,7 +13,7 @@ npm ci
 npm run dev
 ```
 
-Validation: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`. Browser tests: `npx playwright install chromium` then `npm run test:e2e`. Production startup after a build: `npm start`. No environment variables are required. See `.env.example` for future server-only configuration; never commit credentials or place secrets in `NEXT_PUBLIC_` variables.
+Validation: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`. Browser tests: `npx playwright install chromium` then `npm run test:e2e`. Production startup after a build: `npm start`. No environment variables are required for the local sample demo. Real recognition requires the server-only configuration in docs/TASK_02A.md. See `.env.example` for future server-only configuration; never commit credentials or place secrets in `NEXT_PUBLIC_` variables.
 
 ## What works
 
@@ -34,7 +36,7 @@ The referenced `LONGRAY_AI_Dubbing_Studio_Codex_Spec_v1.0.md` was not available 
 - `src/components/studio.tsx`: client workspace and local state; reusable badge and voice preview components.
 - `src/types/studio.ts`: project, segment, voice types and the authoritative voice catalog.
 - `src/lib/demo.ts`: isolated fixtures, timestamp formatting, input validation, SRT serialization.
-- `src/lib/services.ts`: typed contracts for Deepgram recognition, OpenAI translation, Google TTS, R2 signed uploads/downloads, and a background worker. Contracts have no implementation and are never instantiated in the demo.
+- `src/lib/services.ts`: typed contracts for Deepgram recognition, OpenAI translation, Google TTS, R2 signed uploads/downloads, and a background worker. ASR contracts have an implementation in `src/server/asr`; other provider contracts remain unimplemented.
 - `tests`: unit coverage for export formatting and upload validation; Playwright coverage for editing, persistence, voice selection, export, navigation, and invalid uploads.
 
 Keep real provider adapters server-only. A future browser client should use authenticated server endpoints, signed media URLs, and durable job IDs. Vercel can host the Next.js UI and short API operations; long-running transcription, alignment, FFmpeg rendering, and retries belong in a separate worker. Do not perform long media jobs in a Vercel request.
